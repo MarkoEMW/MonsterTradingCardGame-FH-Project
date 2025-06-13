@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Holesky Block Height</title>
-    <!-- Load ethers directly from unpkg (more reliable CDN) -->
+
     <script src="https://unpkg.com/ethers@5.7.2/dist/ethers.umd.min.js"></script>
     <style>
         body {
@@ -45,7 +45,7 @@
     <div id="result"></div>
     
     <script>
-        // First verify that ethers loaded correctly
+
         const checkEthers = () => {
             const statusDiv = document.getElementById('status');
             const button = document.getElementById('checkBlockHeight');
@@ -59,7 +59,7 @@
             console.log("Ethers version:", ethers.version);
             statusDiv.innerHTML = "Ethers.js loaded successfully. Checking for MetaMask...";
             
-            // Now check for MetaMask
+
             setTimeout(() => {
                 if (window.ethereum) {
                     statusDiv.innerHTML = "MetaMask detected!";
@@ -74,7 +74,7 @@
             return true;
         };
         
-        // Wait for DOM and scripts to be fully loaded
+     
         window.onload = function() {
             const ethersLoaded = checkEthers();
             if (!ethersLoaded) return;
@@ -86,7 +86,7 @@
                 resultDiv.innerHTML = "Connecting to MetaMask...";
                 
                 try {
-                    // Make sure MetaMask is available
+
                     if (!window.ethereum) {
                         throw new Error("MetaMask is not installed! Please install MetaMask to continue.");
                     }
@@ -94,14 +94,14 @@
                     console.log("Creating Web3Provider with ethereum:", window.ethereum);
                     const provider = new ethers.providers.Web3Provider(window.ethereum);
                     
-                    // Request account access
+        
                     await window.ethereum.request({ method: 'eth_requestAccounts' });
                     const accounts = await provider.listAccounts();
                     console.log("Connected accounts:", accounts);
                     
                     resultDiv.innerHTML = "Connected! Checking network...";
                     
-                    // Check if we're on Holesky testnet
+             
                     const network = await provider.getNetwork();
                     console.log("Current network:", network);
                     
@@ -111,16 +111,16 @@
                         try {
                             await window.ethereum.request({
                                 method: 'wallet_switchEthereumChain',
-                                params: [{ chainId: '0x4268' }], // 0x4268 is hex for 17000
+                                params: [{ chainId: '0x4268' }],
                             });
                             
-                            // Need to refresh the provider after network change
+
                             location.reload();
                             return;
                         } catch (switchError) {
                             console.error("Switch error:", switchError);
                             
-                            // This error code indicates that the chain has not been added to MetaMask
+
                             if (switchError.code === 4902) {
                                 resultDiv.innerHTML = "Adding Holesky network to MetaMask...";
                                 
@@ -154,7 +154,7 @@
                     
                     resultDiv.innerHTML = "Getting block height...";
                     
-                    // Get the latest block number (height)
+
                     const blockNumber = await provider.getBlockNumber();
                     console.log("Current block height:", blockNumber);
                     
@@ -166,7 +166,7 @@
             });
         };
         
-        // Listen for network changes
+
         if (window.ethereum) {
             window.ethereum.on('chainChanged', () => {
                 console.log('Network changed, reloading...');

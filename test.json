@@ -1,0 +1,22 @@
+{
+  "name": "Cool NFT #1234",
+  "description": "This is NFT number 1234 from the Cool NFT collection.",
+  "attributes": [
+    {
+      "trait_type": "Background",
+      "value": "Galaxy Magic"
+    },
+    {
+      "trait_type": "Clothing",
+      "value": "Hoodie"
+    },
+    {
+      "trait_type": "Eyes",
+      "value": "Laser"
+    },
+    {
+      "trait_type": "Mouth",
+      "value": "Smile"
+    }
+  ]
+}

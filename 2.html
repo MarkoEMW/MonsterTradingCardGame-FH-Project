@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ERC20 Token Balance</title>
+    <!-- Load ethers directly from unpkg -->
+    <script src="https://unpkg.com/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin-top: 50px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #result {
+            margin-top: 20px;
+            font-size: 18px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .status {
+            margin-top: 10px;
+            color: #666;
+        }
+        .token-info {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+    <h1>ERC20 Token Balance Checker</h1>
+    
+    <div class="status" id="status">Loading ethers.js...</div>
+    <div class="token-info">
+        <div id="tokenName">Token Name: Loading...</div>
+        <div id="tokenSymbol">Symbol: Loading...</div>
+        <div id="tokenDecimals">Decimals: Loading...</div>
+    </div>
+    <br>
+    <button id="checkBalance" disabled>Check Token Balance</button>
+    
+    <div id="result"></div>
+    
+    <script>
+        // ERC20 contract details - REPLACE WITH YOUR CONTRACT ADDRESS
+        const contractAddress = "0x561a780944d66c7441c5f766a70030da1d261d9e"; // Replace with your ERC20 token contract address
+        
+        // Standard ERC20 ABI for functions we need
+        const contractABI = [
+            "function balanceOf(address account) view returns (uint256)",
+            "function name() view returns (string)",
+            "function symbol() view returns (string)",
+            "function decimals() view returns (uint8)"
+        ];
+        
+        // First verify that ethers loaded correctly
+        const checkEthers = () => {
+            const statusDiv = document.getElementById('status');
+            const button = document.getElementById('checkBalance');
+            
+            if (typeof ethers === 'undefined') {
+                statusDiv.innerHTML = "Failed to load ethers.js library. Please check your internet connection.";
+                statusDiv.style.color = "red";
+                return false;
+            }
+            
+            console.log("Ethers version:", ethers.version);
+            statusDiv.innerHTML = "Ethers.js loaded successfully. Checking for MetaMask...";
+            
+            // Now check for MetaMask
+            setTimeout(() => {
+                if (window.ethereum) {
+                    statusDiv.innerHTML = "MetaMask detected!";
+                    statusDiv.style.color = "green";
+                    button.disabled = false;
+                } else {
+                    statusDiv.innerHTML = "MetaMask not detected. Please install MetaMask extension.";
+                    statusDiv.style.color = "red";
+                }
+            }, 1000);
+            
+            return true;
+        };
+        
+        async function getTokenInfo(contract) {
+            try {
+               console.log("Getting token info from contract:", contract.address);
+                const name = await contract.name();
+                console.log("Token name:", name);
+                const symbol = await contract.symbol();
+                console.log("Token symbol:", symbol);
+                const decimals = await contract.decimals();
+                console.log("Token decimals:", decimals);
+                
+                document.getElementById('tokenName').textContent = `Token Name: ${name}`;
+                document.getElementById('tokenSymbol').textContent = `Symbol: ${symbol}`;
+                document.getElementById('tokenDecimals').textContent = `Decimals: ${decimals}`;
+                
+                return { name, symbol, decimals };
+            } catch (error) {
+                console.error("Error getting token info:", error);
+                document.getElementById('tokenName').textContent = "Token Name: Error fetching";
+                document.getElementById('tokenSymbol').textContent = "Symbol: Error fetching";
+                document.getElementById('tokenDecimals').textContent = "Decimals: Error fetching";
+                return { name: "Unknown", symbol: "Unknown", decimals: 18 };
+            }
+        }
+        
+        // Wait for DOM and scripts to be fully loaded
+        window.onload = function() {
+            const ethersLoaded = checkEthers();
+            if (!ethersLoaded) return;
+            
+            const button = document.getElementById('checkBalance');
+            const resultDiv = document.getElementById('result');
+            
+            button.addEventListener('click', async function() {
+                resultDiv.innerHTML = "Connecting to MetaMask...";
+                
+                try {
+                    // Make sure MetaMask is available
+                    if (!window.ethereum) {
+                        throw new Error("MetaMask is not installed! Please install MetaMask to continue.");
+                    }
+                    
+                    console.log("Creating Web3Provider with ethereum:", window.ethereum);
+                    const provider = new ethers.providers.Web3Provider(window.ethereum);
+                    
+                    // Request account access
+                    await window.ethereum.request({ method: 'eth_requestAccounts' });
+                    const accounts = await provider.listAccounts();
+                    console.log("Connected accounts:", accounts);
+                    
+                    if (accounts.length === 0) {
+                        throw new Error("No accounts found. Please unlock MetaMask.");
+                    }
+                    
+                    const userAddress = accounts[0];
+                    resultDiv.innerHTML = "Connected! Checking network...";
+                    
+                    // Check if we're on Holesky testnet
+                    const network = await provider.getNetwork();
+                    console.log("Current network:", network);
+                    
+                    if (network.chainId !== 17000) {
+                        resultDiv.innerHTML = "Switching to Holesky network...";
+                        
+                        try {
+                            await window.ethereum.request({
+                                method: 'wallet_switchEthereumChain',
+                                params: [{ chainId: '0x4268' }], // 0x4268 is hex for 17000
+                            });
+                            
+                            // Need to refresh the provider after network change
+                            location.reload();
+                            return;
+                        } catch (switchError) {
+                            console.error("Switch error:", switchError);
+                            
+                            // This error code indicates that the chain has not been added to MetaMask
+                            if (switchError.code === 4902) {
+                                resultDiv.innerHTML = "Adding Holesky network to MetaMask...";
+                                
+                                try {
+                                    await window.ethereum.request({
+                                        method: 'wallet_addEthereumChain',
+                                        params: [{
+                                            chainId: '0x4268',
+                                            chainName: 'Holesky Testnet',
+                                            nativeCurrency: {
+                                                name: 'Holesky ETH',
+                                                symbol: 'ETH',
+                                                decimals: 18
+                                            },
+                                            rpcUrls: ['https://ethereum-holesky.publicnode.com'],
+                                            blockExplorerUrls: ['https://holesky.etherscan.io']
+                                        }]
+                                    });
+                                    
+                                    // Reload after adding network
+                                    location.reload();
+                                    return;
+                                } catch (addError) {
+                                    throw new Error('Error adding Holesky network: ' + addError.message);
+                                }
+                            } else {
+                                throw new Error('Error switching to Holesky network: ' + switchError.message);
+                            }
+                        }
+                    }
+                    
+                    resultDiv.innerHTML = "Initializing contract...";
+                    
+                    // Create contract instance
+                    const tokenContract = new ethers.Contract(
+                        contractAddress,
+                        contractABI,
+                        provider
+                    );
+                    
+                    // Get token information
+                    const tokenInfo = await getTokenInfo(tokenContract);
+                    
+                    // Call balanceOf function on the contract
+                    resultDiv.innerHTML = "Checking token balance...";
+                    const balance = await tokenContract.balanceOf(userAddress);
+                    
+                    // Format the balance using the token's decimals
+                    const formattedBalance = ethers.utils.formatUnits(balance, tokenInfo.decimals);
+                    
+                    resultDiv.innerHTML = `
+                        <p>Account: ${userAddress}</p>
+                        <p>Token Balance: <strong>${formattedBalance} ${tokenInfo.symbol}</strong></p>
+                    `;
+                    
+                } catch (error) {
+                    console.error("Error:", error);
+                    resultDiv.innerHTML = 'Error: ' + error.message;
+                }
+            });
+            
+            // Initial attempt to get token info (will only work if already on Holesky)
+            setTimeout(async () => {
+                try {
+                    if (window.ethereum) {
+                        const provider = new ethers.providers.Web3Provider(window.ethereum);
+                        const network = await provider.getNetwork();
+                        
+                        if (network.chainId === 17000) {
+                            const tokenContract = new ethers.Contract(
+                                contractAddress,
+                                contractABI,
+                                provider
+                            );
+                            await getTokenInfo(tokenContract);
+                        }
+                    }
+                } catch (e) {
+                    console.log("Could not get initial token info:", e);
+                }
+            }, 1500);
+        };
+        
+        // Listen for network changes
+        if (window.ethereum) {
+            window.ethereum.on('chainChanged', () => {
+                console.log('Network changed, reloading...');
+                window.location.reload();
+            });
+        }
+    </script>
+</body>
+</html>

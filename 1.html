@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Holesky Block Height</title>
+    <!-- Load ethers directly from unpkg (more reliable CDN) -->
+    <script src="https://unpkg.com/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin-top: 50px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #result {
+            margin-top: 20px;
+            font-size: 18px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .status {
+            margin-top: 10px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <h1>Holesky Testnet Block Height</h1>
+    
+    <div class="status" id="status">Loading ethers.js...</div>
+    <button id="checkBlockHeight" disabled>Check Current Block Height</button>
+    
+    <div id="result"></div>
+    
+    <script>
+        // First verify that ethers loaded correctly
+        const checkEthers = () => {
+            const statusDiv = document.getElementById('status');
+            const button = document.getElementById('checkBlockHeight');
+            
+            if (typeof ethers === 'undefined') {
+                statusDiv.innerHTML = "Failed to load ethers.js library. Please check your internet connection.";
+                statusDiv.style.color = "red";
+                return false;
+            }
+            
+            console.log("Ethers version:", ethers.version);
+            statusDiv.innerHTML = "Ethers.js loaded successfully. Checking for MetaMask...";
+            
+            // Now check for MetaMask
+            setTimeout(() => {
+                if (window.ethereum) {
+                    statusDiv.innerHTML = "MetaMask detected!";
+                    statusDiv.style.color = "green";
+                    button.disabled = false;
+                } else {
+                    statusDiv.innerHTML = "MetaMask not detected. Please install MetaMask extension.";
+                    statusDiv.style.color = "red";
+                }
+            }, 1000);
+            
+            return true;
+        };
+        
+        // Wait for DOM and scripts to be fully loaded
+        window.onload = function() {
+            const ethersLoaded = checkEthers();
+            if (!ethersLoaded) return;
+            
+            const button = document.getElementById('checkBlockHeight');
+            const resultDiv = document.getElementById('result');
+            
+            button.addEventListener('click', async function() {
+                resultDiv.innerHTML = "Connecting to MetaMask...";
+                
+                try {
+                    // Make sure MetaMask is available
+                    if (!window.ethereum) {
+                        throw new Error("MetaMask is not installed! Please install MetaMask to continue.");
+                    }
+                    
+                    console.log("Creating Web3Provider with ethereum:", window.ethereum);
+                    const provider = new ethers.providers.Web3Provider(window.ethereum);
+                    
+                    // Request account access
+                    await window.ethereum.request({ method: 'eth_requestAccounts' });
+                    const accounts = await provider.listAccounts();
+                    console.log("Connected accounts:", accounts);
+                    
+                    resultDiv.innerHTML = "Connected! Checking network...";
+                    
+                    // Check if we're on Holesky testnet
+                    const network = await provider.getNetwork();
+                    console.log("Current network:", network);
+                    
+                    if (network.chainId !== 17000) {
+                        resultDiv.innerHTML = "Switching to Holesky network...";
+                        
+                        try {
+                            await window.ethereum.request({
+                                method: 'wallet_switchEthereumChain',
+                                params: [{ chainId: '0x4268' }], // 0x4268 is hex for 17000
+                            });
+                            
+                            // Need to refresh the provider after network change
+                            location.reload();
+                            return;
+                        } catch (switchError) {
+                            console.error("Switch error:", switchError);
+                            
+                            // This error code indicates that the chain has not been added to MetaMask
+                            if (switchError.code === 4902) {
+                                resultDiv.innerHTML = "Adding Holesky network to MetaMask...";
+                                
+                                try {
+                                    await window.ethereum.request({
+                                        method: 'wallet_addEthereumChain',
+                                        params: [{
+                                            chainId: '0x4268',
+                                            chainName: 'Holesky Testnet',
+                                            nativeCurrency: {
+                                                name: 'Holesky ETH',
+                                                symbol: 'ETH',
+                                                decimals: 18
+                                            },
+                                            rpcUrls: ['https://ethereum-holesky.publicnode.com'],
+                                            blockExplorerUrls: ['https://holesky.etherscan.io']
+                                        }]
+                                    });
+                                    
+                                    // Reload after adding network
+                                    location.reload();
+                                    return;
+                                } catch (addError) {
+                                    throw new Error('Error adding Holesky network: ' + addError.message);
+                                }
+                            } else {
+                                throw new Error('Error switching to Holesky network: ' + switchError.message);
+                            }
+                        }
+                    }
+                    
+                    resultDiv.innerHTML = "Getting block height...";
+                    
+                    // Get the latest block number (height)
+                    const blockNumber = await provider.getBlockNumber();
+                    console.log("Current block height:", blockNumber);
+                    
+                    resultDiv.innerHTML = `Current Holesky Block Height: <strong>${blockNumber}</strong>`;
+                } catch (error) {
+                    console.error("Error:", error);
+                    resultDiv.innerHTML = 'Error: ' + error.message;
+                }
+            });
+        };
+        
+        // Listen for network changes
+        if (window.ethereum) {
+            window.ethereum.on('chainChanged', () => {
+                console.log('Network changed, reloading...');
+                window.location.reload();
+            });
+        }
+    </script>
+</body>
+</html>
